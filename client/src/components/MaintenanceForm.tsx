@@ -89,6 +89,7 @@ export function MaintenanceForm({
   assets,
   initial,
   lockAsset,
+  logNumber,
   submitLabel = 'Save',
   onSubmit,
   onCancel,
@@ -96,6 +97,8 @@ export function MaintenanceForm({
   assets: Asset[];
   initial: MaintenanceFormValues;
   lockAsset?: boolean;
+  /** Existing log number when editing (read-only). */
+  logNumber?: string;
   submitLabel?: string;
   onSubmit: (values: MaintenanceFormValues) => Promise<void> | void;
   onCancel: () => void;
@@ -115,6 +118,12 @@ export function MaintenanceForm({
 
   return (
     <form className="form-grid" onSubmit={handleSubmit}>
+      {logNumber ? (
+        <div className="form-row">
+          <label>Log number</label>
+          <input value={logNumber} readOnly disabled />
+        </div>
+      ) : null}
       <div className="form-row">
         <label>Asset</label>
         <select

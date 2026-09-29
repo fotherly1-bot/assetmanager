@@ -7,11 +7,12 @@ import { Modal } from '../components/Modal';
 import {
   MaintenanceForm,
   emptyMaintForm,
+  formFromRecord,
   payloadFromForm,
   type MaintenanceFormValues,
 } from '../components/MaintenanceForm';
 import { daysOnJob, formatDate, formatOutOfService, gbp, todayISO } from '../lib/format';
-import type { Asset, FuelLog, MaintenanceRecord } from '../types';
+import { MAINT_STATUSES, type Asset, type FuelLog, type MaintenanceRecord } from '../types';
 import { categoryLabel } from '../lib/categories';
 
 export function AssetDetail() {
@@ -34,6 +35,8 @@ export function AssetDetail() {
   const [receiptError, setReceiptError] = useState('');
   const [viewReceipt, setViewReceipt] = useState<{ url: string; name: string; mime: string } | null>(null);
   const [maintOpen, setMaintOpen] = useState(false);
+  const [maintEditing, setMaintEditing] = useState<MaintenanceRecord | null>(null);
+  const [maintDetail, setMaintDetail] = useState<MaintenanceRecord | null>(null);
   const [maintForm, setMaintForm] = useState<MaintenanceFormValues>(emptyMaintForm());
 
   function load() {
@@ -121,17 +124,52 @@ export function AssetDetail() {
   }
 
   function openMaint() {
+    setMaintDetail(null);
+    setMaintEditing(null);
     setMaintForm(emptyMaintForm(id || ''));
     setMaintOpen(true);
   }
 
-  async function saveMaint(values: MaintenanceFormValues) {
-    await api('/api/maintenance', {
-      method: 'POST',
-      body: JSON.stringify(payloadFromForm(values)),
-    });
+  function openMaintEdit(m: MaintenanceRecord) {
+    setMaintDetail(null);
+    setMaintEditing(m);
+    setMaintForm(formFromRecord(m));
+    setMaintOpen(true);
+  }
+
+  function openMaintDetail(m: MaintenanceRecord) {
     setMaintOpen(false);
+    setMaintEditing(null);
+    setMaintDetail(m);
+  }
+
+  async function saveMaint(values: MaintenanceFormValues) {
+    const body = payloadFromForm(values);
+    if (maintEditing) {
+      await api(`/api/maintenance/${maintEditing.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+    } else {
+      await api('/api/maintenance', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+    }
+    setMaintOpen(false);
+    setMaintEditing(null);
     load();
+  }
+
+  async function removeMaint(maintId: string) {
+    if (!confirm('Delete this maintenance record?')) return;
+    await api(`/api/maintenance/${maintId}`, { method: 'DELETE' });
+    setMaintDetail(null);
+    load();
+  }
+
+  function maintStatusLabel(s: string) {
+    return MAINT_STATUSES.find((x) => x.value === s)?.label || s || '—';
   }
 
   async function remove() {
@@ -312,10 +350,12 @@ export function AssetDetail() {
             <table className="data" style={{ marginTop: '0.75rem' }}>
               <thead>
                 <tr>
+                  <th>Log no.</th>
                   <th>Type</th>
                   <th>Status</th>
                   <th>Next due</th>
                   <th>Cost</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -324,6 +364,9 @@ export function AssetDetail() {
                     m.status === 'overdue' || (m.nextDue && m.nextDue < today && m.status !== 'completed');
                   return (
                     <tr key={m.id}>
+                      <td>
+                        <code style={{ fontSize: '0.8rem' }}>{m.logNumber || '—'}</code>
+                      </td>
                       <td>
                         {m.type}
                         {m.outOfService && (
@@ -334,13 +377,18 @@ export function AssetDetail() {
                       </td>
                       <td>
                         <span className={`badge ${overdue ? 'badge-red' : m.status === 'completed' ? 'badge-green' : 'badge-amber'}`}>
-                          {m.status || m.result || '—'}
+                          {maintStatusLabel(m.status) || m.result || '—'}
                         </span>
                       </td>
                       <td>
                         <span className={`badge ${overdue ? 'badge-red' : 'badge-grey'}`}>{formatDate(m.nextDue)}</span>
                       </td>
                       <td>{m.costGbp ? gbp(m.costGbp) : '—'}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <button className="btn btn-sm" type="button" onClick={() => openMaintDetail(m)}>
+                          More info
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -485,15 +533,80 @@ export function AssetDetail() {
       )}
 
       {maintOpen && (
-        <Modal title="Add maintenance" onClose={() => setMaintOpen(false)} large>
+        <Modal
+          title={
+            maintEditing
+              ? `Edit maintenance${maintEditing.logNumber ? ` · ${maintEditing.logNumber}` : ''}`
+              : 'Add maintenance'
+          }
+          onClose={() => setMaintOpen(false)}
+          large
+        >
           <MaintenanceForm
+            key={maintEditing?.id || 'new'}
             assets={[asset]}
             initial={maintForm}
             lockAsset
-            submitLabel="Save booking"
+            logNumber={maintEditing?.logNumber}
+            submitLabel={maintEditing ? 'Update' : 'Save booking'}
             onSubmit={saveMaint}
             onCancel={() => setMaintOpen(false)}
           />
+        </Modal>
+      )}
+
+      {maintDetail && (
+        <Modal
+          title={`Maintenance log · ${maintDetail.logNumber || maintDetail.id}`}
+          onClose={() => setMaintDetail(null)}
+          large
+        >
+          <dl className="dl">
+            <dt>Log number</dt>
+            <dd>
+              <code>{maintDetail.logNumber || '—'}</code>
+            </dd>
+            <dt>Type</dt>
+            <dd>{maintDetail.type || '—'}</dd>
+            <dt>Status</dt>
+            <dd>{maintStatusLabel(maintDetail.status)}</dd>
+            <dt>Result</dt>
+            <dd>{maintDetail.result || '—'}</dd>
+            <dt>Scheduled</dt>
+            <dd>{formatDate(maintDetail.scheduledDate || maintDetail.date)}</dd>
+            <dt>Completed</dt>
+            <dd>{formatDate(maintDetail.completedDate)}</dd>
+            <dt>Next due</dt>
+            <dd>{formatDate(maintDetail.nextDue)}</dd>
+            <dt>Cost</dt>
+            <dd>{maintDetail.costGbp ? gbp(maintDetail.costGbp) : '—'}</dd>
+            <dt>Vendor / garage</dt>
+            <dd>{maintDetail.vendor || '—'}</dd>
+            <dt>Description</dt>
+            <dd style={{ whiteSpace: 'pre-wrap' }}>{maintDetail.description || '—'}</dd>
+            <dt>Notes</dt>
+            <dd style={{ whiteSpace: 'pre-wrap' }}>{maintDetail.notes || '—'}</dd>
+            <dt>Out of service</dt>
+            <dd>
+              {maintDetail.outOfService
+                ? formatOutOfService(maintDetail.outOfServiceStart, maintDetail.outOfServiceEnd)
+                : 'No'}
+            </dd>
+          </dl>
+          <div className="form-actions" style={{ marginTop: '1.25rem' }}>
+            <button type="button" className="btn" onClick={() => setMaintDetail(null)}>
+              Close
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => openMaintEdit(maintDetail)}>
+              Edit booking
+            </button>
+            <button type="button" className="btn" onClick={openMaint}>
+              Add booking
+            </button>
+            <button type="button" className="btn btn-danger" onClick={() => removeMaint(maintDetail.id)}>
+              Delete
+            </button>
+          </div>
         </Modal>
       )}
     </div>

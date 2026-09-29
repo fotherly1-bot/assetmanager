@@ -425,20 +425,20 @@ function defaultDb() {
   ];
 
   const maintenance = [
-    { id: 'mnt-1', assetId: 'asset-1', type: 'Service', date: '2026-08-12', scheduledDate: '2026-08-12', completedDate: '2026-08-12', nextDue: '2027-02-12', status: 'completed', result: 'Pass', costGbp: 485.0, vendor: 'Nottingham Fleet Services', description: 'Full service + brake check', notes: 'Full service + brake check', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
-    { id: 'mnt-2', assetId: 'asset-1', type: 'MOT', date: '2026-03-01', scheduledDate: '2026-03-01', completedDate: '2026-03-01', nextDue: '2027-03-01', status: 'completed', result: 'Pass', costGbp: 168.0, vendor: 'DVSA Authorised – Area 7', description: 'Class 7 MOT', notes: 'Class 7 MOT', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
-    { id: 'mnt-3', assetId: 'asset-2', type: 'MOT', date: '2025-11-20', scheduledDate: '2025-11-20', completedDate: '2025-11-20', nextDue: '2026-11-20', status: 'completed', result: 'Pass', costGbp: 54.85, vendor: 'Lincoln MOT Centre', description: 'Class 4 MOT', notes: 'No advisories', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
-    { id: 'mnt-4', assetId: 'asset-2', type: 'Service', date: '2026-06-01', scheduledDate: '2026-06-01', completedDate: '2026-06-01', nextDue: '2026-12-01', status: 'completed', result: 'Pass', costGbp: 220.0, vendor: 'Lincolnshire Van Care', description: 'Oil & filters', notes: 'Oil & filters', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
-    { id: 'mnt-5', assetId: 'asset-3', type: 'LOLER', date: '2026-05-10', scheduledDate: '2026-05-10', completedDate: '2026-05-10', nextDue: '2026-11-10', status: 'completed', result: 'Pass', costGbp: 320.0, vendor: 'LiftSafe Inspections', description: 'Thorough examination', notes: 'Thorough examination', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
-    { id: 'mnt-6', assetId: 'asset-3', type: 'MOT', date: '2026-01-15', scheduledDate: '2026-01-15', completedDate: '2026-01-15', nextDue: '2027-01-15', status: 'completed', result: 'Pass', costGbp: 58.0, vendor: 'Nottingham Fleet Services', description: 'Class 7 MOT', notes: '', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
-    { id: 'mnt-7', assetId: 'asset-4', type: 'Service', date: '2026-07-01', scheduledDate: '2026-07-01', completedDate: '2026-07-01', nextDue: '2027-01-01', status: 'completed', result: 'Pass', costGbp: 890.0, vendor: 'JCB Contract Care', description: '500-hour service', notes: '500-hour service', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
-    { id: 'mnt-8', assetId: 'asset-5', type: 'Service', date: '2026-02-20', scheduledDate: '2026-02-20', completedDate: '2026-02-20', nextDue: '2026-08-20', status: 'overdue', result: 'Pass', costGbp: 245.0, vendor: 'PlantFix Midlands', description: 'Roller service', notes: 'OVERDUE – vibration issue noted', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
-    { id: 'mnt-9', assetId: 'asset-7', type: 'PAT', date: '2025-10-05', scheduledDate: '2025-10-05', completedDate: '2025-10-05', nextDue: '2026-10-05', status: 'completed', result: 'Pass', costGbp: 35.0, vendor: 'PATSafe UK', description: 'Portable appliance test', notes: 'Due soon', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
-    { id: 'mnt-10', assetId: 'asset-8', type: 'PAT', date: '2026-01-10', scheduledDate: '2026-01-10', completedDate: '2026-01-10', nextDue: '2027-01-10', status: 'completed', result: 'Pass', costGbp: 48.0, vendor: 'PATSafe UK', description: 'All three units', notes: 'All three units', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
-    { id: 'mnt-11', assetId: 'asset-9', type: 'PAT', date: '2025-09-01', scheduledDate: '2025-09-01', completedDate: '2025-09-01', nextDue: '2026-09-01', status: 'overdue', result: 'Fail', costGbp: 42.0, vendor: 'PATSafe UK', description: 'Lead inspection', notes: 'OVERDUE – failed lead inspection, awaiting retest', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
-    { id: 'mnt-12', assetId: 'asset-6', type: 'Service', date: '2026-04-18', scheduledDate: '2026-04-18', completedDate: '2026-04-18', nextDue: '2026-10-18', status: 'completed', result: 'Pass', costGbp: 310.0, vendor: 'Atlas Copco Service', description: 'Annual service', notes: 'Annual service', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
-    { id: 'mnt-13', assetId: 'asset-5', type: 'Repair', date: '', scheduledDate: '2026-09-25', completedDate: '', nextDue: '', status: 'in_progress', result: '', costGbp: 650.0, vendor: 'PlantFix Midlands', description: 'Vibration module replacement', notes: 'Awaiting parts – out of service', outOfService: true, outOfServiceStart: '2026-09-25', outOfServiceEnd: '', createdAt: now },
-    { id: 'mnt-14', assetId: 'asset-3', type: 'Service', date: '', scheduledDate: '2026-10-08', completedDate: '', nextDue: '2026-10-08', status: 'scheduled', result: '', costGbp: 275.0, vendor: 'Nottingham Fleet Services', description: 'Pre-hire service before lighting job', notes: 'Booked for week commencing 6 Oct', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
+    { id: 'mnt-1', logNumber: 'ML-0001', assetId: 'asset-1', type: 'Service', date: '2026-08-12', scheduledDate: '2026-08-12', completedDate: '2026-08-12', nextDue: '2027-02-12', status: 'completed', result: 'Pass', costGbp: 485.0, vendor: 'Nottingham Fleet Services', description: 'Full service + brake check', notes: 'Full service + brake check', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
+    { id: 'mnt-2', logNumber: 'ML-0002', assetId: 'asset-1', type: 'MOT', date: '2026-03-01', scheduledDate: '2026-03-01', completedDate: '2026-03-01', nextDue: '2027-03-01', status: 'completed', result: 'Pass', costGbp: 168.0, vendor: 'DVSA Authorised – Area 7', description: 'Class 7 MOT', notes: 'Class 7 MOT', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
+    { id: 'mnt-3', logNumber: 'ML-0003', assetId: 'asset-2', type: 'MOT', date: '2025-11-20', scheduledDate: '2025-11-20', completedDate: '2025-11-20', nextDue: '2026-11-20', status: 'completed', result: 'Pass', costGbp: 54.85, vendor: 'Lincoln MOT Centre', description: 'Class 4 MOT', notes: 'No advisories', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
+    { id: 'mnt-4', logNumber: 'ML-0004', assetId: 'asset-2', type: 'Service', date: '2026-06-01', scheduledDate: '2026-06-01', completedDate: '2026-06-01', nextDue: '2026-12-01', status: 'completed', result: 'Pass', costGbp: 220.0, vendor: 'Lincolnshire Van Care', description: 'Oil & filters', notes: 'Oil & filters', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
+    { id: 'mnt-5', logNumber: 'ML-0005', assetId: 'asset-3', type: 'LOLER', date: '2026-05-10', scheduledDate: '2026-05-10', completedDate: '2026-05-10', nextDue: '2026-11-10', status: 'completed', result: 'Pass', costGbp: 320.0, vendor: 'LiftSafe Inspections', description: 'Thorough examination', notes: 'Thorough examination', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
+    { id: 'mnt-6', logNumber: 'ML-0006', assetId: 'asset-3', type: 'MOT', date: '2026-01-15', scheduledDate: '2026-01-15', completedDate: '2026-01-15', nextDue: '2027-01-15', status: 'completed', result: 'Pass', costGbp: 58.0, vendor: 'Nottingham Fleet Services', description: 'Class 7 MOT', notes: '', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
+    { id: 'mnt-7', logNumber: 'ML-0007', assetId: 'asset-4', type: 'Service', date: '2026-07-01', scheduledDate: '2026-07-01', completedDate: '2026-07-01', nextDue: '2027-01-01', status: 'completed', result: 'Pass', costGbp: 890.0, vendor: 'JCB Contract Care', description: '500-hour service', notes: '500-hour service', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
+    { id: 'mnt-8', logNumber: 'ML-0008', assetId: 'asset-5', type: 'Service', date: '2026-02-20', scheduledDate: '2026-02-20', completedDate: '2026-02-20', nextDue: '2026-08-20', status: 'overdue', result: 'Pass', costGbp: 245.0, vendor: 'PlantFix Midlands', description: 'Roller service', notes: 'OVERDUE – vibration issue noted', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
+    { id: 'mnt-9', logNumber: 'ML-0009', assetId: 'asset-7', type: 'PAT', date: '2025-10-05', scheduledDate: '2025-10-05', completedDate: '2025-10-05', nextDue: '2026-10-05', status: 'completed', result: 'Pass', costGbp: 35.0, vendor: 'PATSafe UK', description: 'Portable appliance test', notes: 'Due soon', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
+    { id: 'mnt-10', logNumber: 'ML-0010', assetId: 'asset-8', type: 'PAT', date: '2026-01-10', scheduledDate: '2026-01-10', completedDate: '2026-01-10', nextDue: '2027-01-10', status: 'completed', result: 'Pass', costGbp: 48.0, vendor: 'PATSafe UK', description: 'All three units', notes: 'All three units', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
+    { id: 'mnt-11', logNumber: 'ML-0011', assetId: 'asset-9', type: 'PAT', date: '2025-09-01', scheduledDate: '2025-09-01', completedDate: '2025-09-01', nextDue: '2026-09-01', status: 'overdue', result: 'Fail', costGbp: 42.0, vendor: 'PATSafe UK', description: 'Lead inspection', notes: 'OVERDUE – failed lead inspection, awaiting retest', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
+    { id: 'mnt-12', logNumber: 'ML-0012', assetId: 'asset-6', type: 'Service', date: '2026-04-18', scheduledDate: '2026-04-18', completedDate: '2026-04-18', nextDue: '2026-10-18', status: 'completed', result: 'Pass', costGbp: 310.0, vendor: 'Atlas Copco Service', description: 'Annual service', notes: 'Annual service', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
+    { id: 'mnt-13', logNumber: 'ML-0013', assetId: 'asset-5', type: 'Repair', date: '', scheduledDate: '2026-09-25', completedDate: '', nextDue: '', status: 'in_progress', result: '', costGbp: 650.0, vendor: 'PlantFix Midlands', description: 'Vibration module replacement', notes: 'Awaiting parts – out of service', outOfService: true, outOfServiceStart: '2026-09-25', outOfServiceEnd: '', createdAt: now },
+    { id: 'mnt-14', logNumber: 'ML-0014', assetId: 'asset-3', type: 'Service', date: '', scheduledDate: '2026-10-08', completedDate: '', nextDue: '2026-10-08', status: 'scheduled', result: '', costGbp: 275.0, vendor: 'Nottingham Fleet Services', description: 'Pre-hire service before lighting job', notes: 'Booked for week commencing 6 Oct', outOfService: false, outOfServiceStart: '', outOfServiceEnd: '', createdAt: now },
   ];
 
   const bookings = [
@@ -477,6 +477,36 @@ function defaultDb() {
   };
 }
 
+function parseLogSeq(logNumber) {
+  if (!logNumber) return 0;
+  const m = String(logNumber).match(/(\d+)\s*$/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+function formatLogNumber(seq) {
+  return `ML-${String(seq).padStart(4, '0')}`;
+}
+
+function ensureMaintLogNumbers(db) {
+  let changed = false;
+  let max = 0;
+  for (const m of db.maintenance || []) {
+    max = Math.max(max, parseLogSeq(m.logNumber));
+  }
+  const missing = (db.maintenance || [])
+    .filter((m) => !m.logNumber)
+    .sort((a, b) =>
+      String(a.createdAt || '').localeCompare(String(b.createdAt || '')) ||
+      String(a.id || '').localeCompare(String(b.id || ''))
+    );
+  for (const m of missing) {
+    max += 1;
+    m.logNumber = formatLogNumber(max);
+    changed = true;
+  }
+  return changed;
+}
+
 function load() {
   ensureDir();
   if (!fs.existsSync(DB_FILE)) {
@@ -484,7 +514,9 @@ function load() {
     save(db);
     return db;
   }
-  return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  const db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  if (ensureMaintLogNumbers(db)) save(db);
+  return db;
 }
 
 function save(db) {

@@ -228,6 +228,45 @@ app.delete('/api/fuel/:id', auth, (req, res) => {
 });
 
 
+
+function parseLogSeq(logNumber) {
+  if (!logNumber) return 0;
+  const m = String(logNumber).match(/(\d+)\s*$/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+function formatLogNumber(seq) {
+  return `ML-${String(seq).padStart(4, '0')}`;
+}
+
+function nextLogNumber(db) {
+  let max = 0;
+  for (const m of db.maintenance) {
+    max = Math.max(max, parseLogSeq(m.logNumber));
+  }
+  return formatLogNumber(max + 1);
+}
+
+function ensureMaintLogNumbers(db) {
+  let changed = false;
+  let max = 0;
+  for (const m of db.maintenance) {
+    max = Math.max(max, parseLogSeq(m.logNumber));
+  }
+  const missing = db.maintenance
+    .filter((m) => !m.logNumber)
+    .sort((a, b) =>
+      String(a.createdAt || '').localeCompare(String(b.createdAt || '')) ||
+      String(a.id || '').localeCompare(String(b.id || ''))
+    );
+  for (const m of missing) {
+    max += 1;
+    m.logNumber = formatLogNumber(max);
+    changed = true;
+  }
+  return changed;
+}
+
 function normalizeMaint(raw) {
   const scheduledDate = String(raw.scheduledDate || raw.date || '');
   const completedDate = String(raw.completedDate || (raw.status === 'completed' || raw.result ? raw.date : '') || '');
@@ -241,6 +280,7 @@ function normalizeMaint(raw) {
   if (status === 'scheduled' && scheduledDate && scheduledDate < t) status = 'overdue';
   return {
     ...raw,
+    logNumber: String(raw.logNumber || ''),
     type: raw.type || 'Service',
     date: completedDate || scheduledDate || String(raw.date || t),
     scheduledDate,
@@ -292,6 +332,7 @@ function buildMaintEntry(body, existing) {
   return normalizeMaint({
     ...(existing || {}),
     ...body,
+    logNumber: existing?.logNumber || body.logNumber || '',
     type: body.type ?? existing?.type ?? 'Service',
     scheduledDate,
     completedDate,
@@ -328,10 +369,12 @@ app.post('/api/maintenance', auth, (req, res) => {
   const entry = buildMaintEntry(req.body, {
     id: id(),
     assetId: req.body.assetId,
+    logNumber: nextLogNumber(db),
     createdAt: new Date().toISOString(),
   });
   entry.id = entry.id || id();
   entry.assetId = req.body.assetId;
+  entry.logNumber = entry.logNumber || nextLogNumber(db);
   entry.createdAt = entry.createdAt || new Date().toISOString();
   db.maintenance.push(entry);
   syncAssetOutOfService(db, entry.assetId);
@@ -346,6 +389,7 @@ app.put('/api/maintenance/:id', auth, (req, res) => {
   const prev = db.maintenance[idx];
   const entry = buildMaintEntry(req.body, prev);
   entry.id = prev.id;
+  entry.logNumber = prev.logNumber || nextLogNumber(db);
   entry.createdAt = prev.createdAt;
   db.maintenance[idx] = entry;
   syncAssetOutOfService(db, entry.assetId);

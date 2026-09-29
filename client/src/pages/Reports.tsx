@@ -302,6 +302,7 @@ export function Reports() {
             <table className="data">
               <thead>
                 <tr>
+                  <th>Log no.</th>
                   <th>Asset</th>
                   <th>Type</th>
                   <th>Scheduled</th>
@@ -314,6 +315,9 @@ export function Reports() {
               <tbody>
                 {maint.rows.map((m) => (
                   <tr key={m.id}>
+                    <td>
+                      <code style={{ fontSize: '0.8rem' }}>{m.logNumber || '—'}</code>
+                    </td>
                     <td>
                       {m.assetName}
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{m.sku}</div>

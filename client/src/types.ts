@@ -88,6 +88,8 @@ export interface FuelLog {
 
 export interface MaintenanceRecord {
   id: string;
+  /** Human-readable unique maintenance log number, e.g. ML-0001 */
+  logNumber: string;
   assetId: string;
   type: string;
   /** Completed date (legacy field name kept for compatibility). */
