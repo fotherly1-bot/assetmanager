@@ -6,6 +6,7 @@ import { ConditionBadge, JobStatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
 import { daysOnJob, formatDate, gbp, todayISO } from '../lib/format';
 import type { Asset, FuelLog, MaintenanceRecord } from '../types';
+import { categoryLabel } from '../lib/categories';
 
 export function AssetDetail() {
   const { id } = useParams();
@@ -13,8 +14,19 @@ export function AssetDetail() {
   const [asset, setAsset] = useState<Asset | null>(null);
   const [fuelOpen, setFuelOpen] = useState(false);
   const [levelOpen, setLevelOpen] = useState(false);
-  const [fuelForm, setFuelForm] = useState({ date: todayISO(), litres: '', costGbp: '', odometerOrHours: '', notes: '' });
+  const [fuelForm, setFuelForm] = useState({
+    date: todayISO(),
+    litres: '',
+    costGbp: '',
+    odometerOrHours: '',
+    notes: '',
+    receiptDataUrl: '' as string,
+    receiptName: '' as string,
+    receiptMime: '' as string,
+  });
   const [level, setLevel] = useState('');
+  const [receiptError, setReceiptError] = useState('');
+  const [viewReceipt, setViewReceipt] = useState<{ url: string; name: string; mime: string } | null>(null);
 
   function load() {
     if (!id) return;
@@ -28,6 +40,37 @@ export function AssetDetail() {
     load();
   }, [id]);
 
+  const MAX_RECEIPT_BYTES = 700000;
+
+  async function onReceiptFile(file: File | null) {
+    setReceiptError('');
+    if (!file) {
+      setFuelForm((f) => ({ ...f, receiptDataUrl: '', receiptName: '', receiptMime: '' }));
+      return;
+    }
+    const okType = file.type.startsWith('image/') || file.type === 'application/pdf';
+    if (!okType) {
+      setReceiptError('Please attach an image or PDF receipt.');
+      return;
+    }
+    if (file.size > MAX_RECEIPT_BYTES) {
+      setReceiptError('Receipt is too large (max ~700 KB for MVP storage).');
+      return;
+    }
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+    setFuelForm((f) => ({
+      ...f,
+      receiptDataUrl: dataUrl,
+      receiptName: file.name,
+      receiptMime: file.type,
+    }));
+  }
+
   async function saveFuel(e: FormEvent) {
     e.preventDefault();
     await api('/api/fuel', {
@@ -39,10 +82,23 @@ export function AssetDetail() {
         costGbp: Number(fuelForm.costGbp),
         odometerOrHours: fuelForm.odometerOrHours === '' ? null : Number(fuelForm.odometerOrHours),
         notes: fuelForm.notes,
+        receiptDataUrl: fuelForm.receiptDataUrl || null,
+        receiptName: fuelForm.receiptName || null,
+        receiptMime: fuelForm.receiptMime || null,
       }),
     });
     setFuelOpen(false);
-    setFuelForm({ date: todayISO(), litres: '', costGbp: '', odometerOrHours: '', notes: '' });
+    setReceiptError('');
+    setFuelForm({
+      date: todayISO(),
+      litres: '',
+      costGbp: '',
+      odometerOrHours: '',
+      notes: '',
+      receiptDataUrl: '',
+      receiptName: '',
+      receiptMime: '',
+    });
     load();
   }
 
@@ -78,7 +134,7 @@ export function AssetDetail() {
           </p>
           <h2>{asset.name}</h2>
           <p>
-            {asset.category} · <ConditionBadge condition={asset.condition} />
+            {categoryLabel(asset.category)} · <ConditionBadge condition={asset.condition} />
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -167,6 +223,7 @@ export function AssetDetail() {
                     <th>Cost</th>
                     <th>Odo / hrs</th>
                     <th>Notes</th>
+                    <th>Receipt</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -177,6 +234,30 @@ export function AssetDetail() {
                       <td>{gbp(f.costGbp)}</td>
                       <td>{f.odometerOrHours ?? '—'}</td>
                       <td>{f.notes || '—'}</td>
+                      <td>
+                        {f.receiptDataUrl ? (
+                          <button
+                            type="button"
+                            className="btn btn-sm receipt-thumb-btn"
+                            onClick={() =>
+                              setViewReceipt({
+                                url: f.receiptDataUrl!,
+                                name: f.receiptName || 'Fuel receipt',
+                                mime: f.receiptMime || '',
+                              })
+                            }
+                            title={f.receiptName || 'View receipt'}
+                          >
+                            {(f.receiptMime || '').startsWith('image/') ? (
+                              <img src={f.receiptDataUrl} alt="" className="receipt-thumb" />
+                            ) : (
+                              <span>PDF {f.receiptName || 'receipt'}</span>
+                            )}
+                          </button>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -277,15 +358,61 @@ export function AssetDetail() {
               <label>Notes</label>
               <input value={fuelForm.notes} onChange={(e) => setFuelForm({ ...fuelForm, notes: e.target.value })} />
             </div>
+            <div className="form-row">
+              <label>Fuel receipt (image or PDF)</label>
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => onReceiptFile(e.target.files?.[0] || null)}
+              />
+              {receiptError && (
+                <p style={{ color: 'var(--danger)', margin: '0.35rem 0 0', fontSize: '0.8rem' }}>{receiptError}</p>
+              )}
+              {fuelForm.receiptDataUrl && !receiptError && (
+                <p style={{ margin: '0.35rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Attached: {fuelForm.receiptName}
+                  {' · '}
+                  <button
+                    type="button"
+                    className="linkish"
+                    onClick={() =>
+                      setFuelForm((f) => ({ ...f, receiptDataUrl: '', receiptName: '', receiptMime: '' }))
+                    }
+                  >
+                    Remove
+                  </button>
+                </p>
+              )}
+            </div>
             <div className="form-actions">
               <button type="button" className="btn" onClick={() => setFuelOpen(false)}>
                 Cancel
               </button>
-              <button type="submit" className="btn btn-primary">
+              <button type="submit" className="btn btn-primary" disabled={!!receiptError}>
                 Save entry
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {viewReceipt && (
+        <Modal title={viewReceipt.name} onClose={() => setViewReceipt(null)} large>
+          <div className="receipt-viewer">
+            {viewReceipt.mime.startsWith('image/') || viewReceipt.url.startsWith('data:image/') ? (
+              <img src={viewReceipt.url} alt={viewReceipt.name} className="receipt-full" />
+            ) : (
+              <iframe title={viewReceipt.name} src={viewReceipt.url} className="receipt-iframe" />
+            )}
+            <div className="form-actions" style={{ marginTop: '0.75rem' }}>
+              <a className="btn" href={viewReceipt.url} target="_blank" rel="noreferrer" download={viewReceipt.name}>
+                Open / download
+              </a>
+              <button type="button" className="btn btn-primary" onClick={() => setViewReceipt(null)}>
+                Close
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
 

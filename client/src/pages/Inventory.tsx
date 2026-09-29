@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { ConditionBadge } from '../components/StatusBadge';
 import { STOCK_CATEGORIES, type Asset, type Category } from '../types';
+import { categoryLabel } from '../lib/categories';
 
 export function Inventory() {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -43,7 +44,7 @@ export function Inventory() {
           <option value="">All stock categories</option>
           {STOCK_CATEGORIES.map((c) => (
             <option key={c} value={c}>
-              {c}
+              {categoryLabel(c)}
             </option>
           ))}
         </select>
@@ -52,7 +53,7 @@ export function Inventory() {
       {Object.entries(byCat).map(([category, items]) => (
         <div key={category} className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body" style={{ paddingBottom: 0 }}>
-            <h3 className="card-title">{category}</h3>
+            <h3 className="card-title">{categoryLabel(category)}</h3>
           </div>
           <table className="data">
             <thead>

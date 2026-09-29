@@ -185,6 +185,9 @@ app.post('/api/fuel', auth, (req, res) => {
     costGbp: Number(req.body.costGbp) || 0,
     odometerOrHours: req.body.odometerOrHours ?? null,
     notes: req.body.notes || '',
+    receiptDataUrl: req.body.receiptDataUrl || null,
+    receiptName: req.body.receiptName || null,
+    receiptMime: req.body.receiptMime || null,
     createdAt: new Date().toISOString(),
   };
   db.fuelLogs.push(entry);
@@ -195,6 +198,23 @@ app.post('/api/fuel', auth, (req, res) => {
   }
   save(db);
   res.status(201).json(entry);
+});
+
+app.put('/api/fuel/:id', auth, (req, res) => {
+  const db = load();
+  const entry = db.fuelLogs.find((f) => f.id === req.params.id);
+  if (!entry) return res.status(404).json({ error: 'Fuel log not found' });
+  const b = req.body || {};
+  if (b.date != null) entry.date = b.date;
+  if (b.litres != null) entry.litres = Number(b.litres) || 0;
+  if (b.costGbp != null) entry.costGbp = Number(b.costGbp) || 0;
+  if (b.odometerOrHours !== undefined) entry.odometerOrHours = b.odometerOrHours;
+  if (b.notes != null) entry.notes = b.notes;
+  if (b.receiptDataUrl !== undefined) entry.receiptDataUrl = b.receiptDataUrl || null;
+  if (b.receiptName !== undefined) entry.receiptName = b.receiptName || null;
+  if (b.receiptMime !== undefined) entry.receiptMime = b.receiptMime || null;
+  save(db);
+  res.json(entry);
 });
 
 app.delete('/api/fuel/:id', auth, (req, res) => {

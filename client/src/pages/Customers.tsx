@@ -5,6 +5,7 @@ import { Modal } from '../components/Modal';
 import { JobStatusBadge } from '../components/StatusBadge';
 import { formatDate } from '../lib/format';
 import type { Customer, Job } from '../types';
+import { CUSTOMER_EMOJI } from '../lib/categories';
 
 const empty = { name: '', contactName: '', contactEmail: '', contactPhone: '', address: '', notes: '' };
 
@@ -126,7 +127,7 @@ export function Customers() {
                 <tr key={c.id} className="clickable" onClick={() => navigate(`/customers/${c.id}`)}>
                   <td>
                     <Link to={`/customers/${c.id}`} onClick={(e) => e.stopPropagation()}>
-                      {c.name}
+                      {CUSTOMER_EMOJI} {c.name}
                     </Link>
                   </td>
                   <td>{c.contactName}</td>
@@ -140,7 +141,7 @@ export function Customers() {
         <div className="card card-body">
           {selected ? (
             <>
-              <h3 className="card-title">{selected.name}</h3>
+              <h3 className="card-title">{CUSTOMER_EMOJI} {selected.name}</h3>
               <dl className="dl">
                 <dt>Contact</dt>
                 <dd>{selected.contactName}</dd>

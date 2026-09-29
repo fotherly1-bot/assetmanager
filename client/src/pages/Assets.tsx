@@ -5,6 +5,7 @@ import { FuelBar } from '../components/FuelBar';
 import { ConditionBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
 import { CATEGORIES, CONDITIONS, type Asset, type Category, type Condition } from '../types';
+import { categoryLabel } from '../lib/categories';
 
 const emptyForm = {
   name: '',
@@ -84,7 +85,7 @@ export function Assets() {
           <option value="">All categories</option>
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>
-              {c}
+              {categoryLabel(c)}
             </option>
           ))}
         </select>
@@ -113,7 +114,7 @@ export function Assets() {
                   </Link>
                 </td>
                 <td style={{ fontFamily: 'var(--mono)', fontSize: '0.8rem' }}>{a.sku}</td>
-                <td>{a.category}</td>
+                <td>{categoryLabel(a.category)}</td>
                 <td>
                   <ConditionBadge condition={a.condition} />
                 </td>
@@ -147,7 +148,9 @@ export function Assets() {
                 <label>Category</label>
                 <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as Category })}>
                   {CATEGORIES.map((c) => (
-                    <option key={c}>{c}</option>
+                    <option key={c} value={c}>
+                      {categoryLabel(c)}
+                    </option>
                   ))}
                 </select>
               </div>

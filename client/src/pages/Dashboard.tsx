@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { FuelBar } from '../components/FuelBar';
 import { formatDate } from '../lib/format';
 import type { Asset, Booking, MaintenanceRecord } from '../types';
+import { categoryLabel } from '../lib/categories';
 
 interface Dash {
   stats: {
@@ -162,6 +163,65 @@ export function Dashboard() {
               ))}
             </ul>
           )}
+        </div>
+      </div>
+
+      <div className="card card-body" style={{ marginTop: '1.25rem' }}>
+        <h3 className="card-title">Stock levels — Building products &amp; Consumables</h3>
+        <p style={{ margin: '0 0 0.75rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+          Current quantities at a glance. Reorder alerts use each item&apos;s reorder level.
+        </p>
+        <div className="grid grid-2">
+          {(['Building products', 'Consumables'] as const).map((cat) => {
+            const items = assets
+              .filter((a) => a.category === cat)
+              .slice()
+              .sort((a, b) => a.name.localeCompare(b.name));
+            return (
+              <div key={cat}>
+                <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>{categoryLabel(cat)}</h4>
+                {items.length === 0 ? (
+                  <p className="empty" style={{ padding: '0.75rem' }}>No items</p>
+                ) : (
+                  <table className="data">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((a) => {
+                        const low = a.reorderLevel != null && a.quantity <= a.reorderLevel;
+                        return (
+                          <tr key={a.id}>
+                            <td>
+                              <Link to={`/assets/${a.id}`}>{a.name}</Link>
+                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{a.sku}</div>
+                            </td>
+                            <td>
+                              <strong>{a.quantity}</strong>
+                              {a.reorderLevel != null ? (
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}> / reorder {a.reorderLevel}</span>
+                              ) : null}
+                            </td>
+                            <td>
+                              {low ? (
+                                <span className="badge badge-amber">Reorder</span>
+                              ) : (
+                                <span className="badge badge-green">OK</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

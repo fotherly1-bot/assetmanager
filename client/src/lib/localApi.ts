@@ -249,6 +249,9 @@ export async function localApiHandle(
       costGbp: Number(body.costGbp) || 0,
       odometerOrHours: body.odometerOrHours ?? null,
       notes: body.notes || '',
+      receiptDataUrl: body.receiptDataUrl || null,
+      receiptName: body.receiptName || null,
+      receiptMime: body.receiptMime || null,
       createdAt: new Date().toISOString(),
     };
     db.fuelLogs.push(entry);
@@ -262,6 +265,20 @@ export async function localApiHandle(
   }
   {
     const m = pathname.match(/^\/api\/fuel\/([^/]+)$/);
+    if (m && method === 'PUT') {
+      const entry = db.fuelLogs.find((f) => f.id === m[1]);
+      if (!entry) throw notFound();
+      if (body.date != null) entry.date = body.date;
+      if (body.litres != null) entry.litres = Number(body.litres) || 0;
+      if (body.costGbp != null) entry.costGbp = Number(body.costGbp) || 0;
+      if (body.odometerOrHours !== undefined) entry.odometerOrHours = body.odometerOrHours;
+      if (body.notes != null) entry.notes = body.notes;
+      if (body.receiptDataUrl !== undefined) entry.receiptDataUrl = body.receiptDataUrl || null;
+      if (body.receiptName !== undefined) entry.receiptName = body.receiptName || null;
+      if (body.receiptMime !== undefined) entry.receiptMime = body.receiptMime || null;
+      saveDb(db);
+      return entry;
+    }
     if (m && method === 'DELETE') {
       db.fuelLogs = db.fuelLogs.filter((f) => f.id !== m[1]);
       saveDb(db);

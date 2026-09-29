@@ -77,6 +77,10 @@ export interface FuelLog {
   costGbp: number;
   odometerOrHours: number | null;
   notes: string;
+  /** Data URL (image/* or application/pdf) of fuel receipt — MVP localStorage/JSON storage. */
+  receiptDataUrl?: string | null;
+  receiptName?: string | null;
+  receiptMime?: string | null;
   createdAt: string;
 }
 

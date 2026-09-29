@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { formatDate, gbp } from '../lib/format';
 import type { Asset, MaintenanceRecord } from '../types';
+import { categoryLabel } from '../lib/categories';
 
 type Tab = 'utilisation' | 'fuel' | 'maintenance' | 'location' | 'category';
 
@@ -71,7 +72,7 @@ export function Reports() {
                 <tr key={r.sku}>
                   <td>{r.name}</td>
                   <td style={{ fontFamily: 'var(--mono)', fontSize: '0.8rem' }}>{r.sku}</td>
-                  <td>{r.category}</td>
+                  <td>{categoryLabel(r.category)}</td>
                   <td>{r.condition}</td>
                   <td>{r.onJob ? 'Yes' : 'No'}</td>
                   <td>{r.bookingDays}</td>
@@ -184,7 +185,7 @@ export function Reports() {
                   {items.map((a) => (
                     <tr key={a.id}>
                       <td>{a.name}</td>
-                      <td>{a.category}</td>
+                      <td>{categoryLabel(a.category)}</td>
                       <td>{a.locationDescription || '—'}</td>
                     </tr>
                   ))}
@@ -201,7 +202,7 @@ export function Reports() {
             <div key={cat} className="card">
               <div className="card-body">
                 <h3 className="card-title">
-                  {cat} ({items.length})
+                  {categoryLabel(cat)} ({items.length})
                 </h3>
               </div>
               <table className="data">

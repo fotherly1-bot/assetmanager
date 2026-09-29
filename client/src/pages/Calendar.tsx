@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import { Modal } from '../components/Modal';
 import { formatDate, overlaps, todayISO } from '../lib/format';
 import type { Asset, Booking, Job } from '../types';
+import { categoryEmoji } from '../lib/categories';
 
 function addDays(iso: string, n: number) {
   const d = new Date(iso + 'T12:00:00');
@@ -110,7 +111,7 @@ export function CalendarPage() {
         {plantAssets.map((a) => (
           <Fragment key={a.id}>
             <div className="cal-cell cal-asset">
-              {a.name}
+              {categoryEmoji(a.category)} {a.name}
               <div style={{ fontWeight: 400, fontSize: '0.7rem', color: 'var(--text-muted)' }}>{a.sku}</div>
             </div>
             {days.map((d) => {
