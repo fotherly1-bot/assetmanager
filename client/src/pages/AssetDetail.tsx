@@ -137,7 +137,7 @@ export function AssetDetail() {
                 <dl className="dl">
                   <dt>Job</dt>
                   <dd>
-                    <Link to="/jobs">{asset.currentJob.title}</Link> <JobStatusBadge status={asset.currentJob.status} />
+                    <Link to={`/jobs?jobId=${encodeURIComponent(asset.currentJob.id)}`}>{asset.currentJob.title}</Link> <JobStatusBadge status={asset.currentJob.status} />
                   </dd>
                   <dt>Location</dt>
                   <dd>{asset.currentJob.location || asset.locationDescription || '—'}</dd>

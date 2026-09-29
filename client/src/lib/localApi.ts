@@ -311,7 +311,12 @@ export async function localApiHandle(
   }
 
   // Jobs
-  if (pathname === '/api/jobs' && method === 'GET') return db.jobs;
+  if (pathname === '/api/jobs' && method === 'GET') {
+    let list = db.jobs;
+    const customerId = query.get('customerId');
+    if (customerId) list = list.filter((j) => j.customerId === customerId);
+    return list;
+  }
   if (pathname === '/api/jobs' && method === 'POST') {
     const item = {
       id: uid(),

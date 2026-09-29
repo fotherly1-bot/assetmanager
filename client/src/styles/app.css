@@ -508,3 +508,16 @@ table.data tr.clickable { cursor: pointer; }
 .legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; }
 .legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+.kanban-card-highlight {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+tr.row-highlight td {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

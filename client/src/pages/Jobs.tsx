@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { Modal } from '../components/Modal';
 import { AvailabilityBadge, JobStatusBadge } from '../components/StatusBadge';
@@ -16,6 +17,9 @@ export function Jobs() {
   const [tab, setTab] = useState<'board' | 'list'>('board');
   const [show, setShow] = useState(false);
   const [editJob, setEditJob] = useState<Job | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkedRef = useRef<string | null>(null);
   const [form, setForm] = useState({
     title: '',
     customerId: '',
@@ -27,12 +31,25 @@ export function Jobs() {
     requiredAssetIds: [] as string[],
   });
 
+  const deepLinkJobId = searchParams.get('jobId') || searchParams.get('job');
+
   function load() {
     api<Planner>('/api/planner').then(setData);
   }
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (!data || !deepLinkJobId) return;
+    if (deepLinkedRef.current === deepLinkJobId) return;
+    const j = data.jobs.find((job) => job.id === deepLinkJobId);
+    if (!j) return;
+    deepLinkedRef.current = deepLinkJobId;
+    setHighlightId(j.id);
+    setTab('list');
+    openEdit(j);
+  }, [data, deepLinkJobId]);
 
   const columns = useMemo(() => {
     const order: JobStatus[] = ['Planned', 'In progress', 'On hold', 'Completed', 'Cancelled'];
@@ -83,6 +100,21 @@ export function Jobs() {
     setShow(true);
   }
 
+  function clearDeepLink() {
+    if (searchParams.has('jobId') || searchParams.has('job')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('jobId');
+      next.delete('job');
+      setSearchParams(next, { replace: true });
+    }
+    deepLinkedRef.current = null;
+  }
+
+  function closeModal() {
+    setShow(false);
+    clearDeepLink();
+  }
+
   function toggleAsset(id: string) {
     setForm((f) => ({
       ...f,
@@ -98,12 +130,15 @@ export function Jobs() {
       await api('/api/jobs', { method: 'POST', body: JSON.stringify(form) });
     }
     setShow(false);
+    clearDeepLink();
     load();
   }
 
   async function onDelete(j: Job) {
     if (!confirm(`Delete job “${j.title}”?`)) return;
     await api(`/api/jobs/${j.id}`, { method: 'DELETE' });
+    setShow(false);
+    clearDeepLink();
     load();
   }
 
@@ -153,7 +188,14 @@ export function Jobs() {
                 {col.status} ({col.jobs.length})
               </h4>
               {col.jobs.map((j) => (
-                <div key={j.id} className="kanban-card" onClick={() => openEdit(j)}>
+                <div
+                  key={j.id}
+                  className={`kanban-card${highlightId === j.id ? ' kanban-card-highlight' : ''}`}
+                  onClick={() => {
+                    setHighlightId(j.id);
+                    openEdit(j);
+                  }}
+                >
                   <h5>{j.title}</h5>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>
                     {customerName(j.customerId)}
@@ -194,7 +236,7 @@ export function Jobs() {
             </thead>
             <tbody>
               {data.jobs.map((j) => (
-                <tr key={j.id}>
+                <tr key={j.id} className={highlightId === j.id ? 'row-highlight' : undefined}>
                   <td>
                     <strong>{j.title}</strong>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{j.location}</div>
@@ -217,7 +259,14 @@ export function Jobs() {
                     })}
                   </td>
                   <td>
-                    <button className="btn btn-sm" type="button" onClick={() => openEdit(j)}>
+                    <button
+                      className="btn btn-sm"
+                      type="button"
+                      onClick={() => {
+                        setHighlightId(j.id);
+                        openEdit(j);
+                      }}
+                    >
                       Edit
                     </button>
                   </td>
@@ -229,7 +278,7 @@ export function Jobs() {
       )}
 
       {show && (
-        <Modal title={editJob ? 'Edit job' : 'Create job'} onClose={() => setShow(false)} large>
+        <Modal title={editJob ? 'Edit job' : 'Create job'} onClose={closeModal} large>
           <form className="form-grid" onSubmit={onSave}>
             <div className="form-row">
               <label>Title</label>
@@ -291,7 +340,7 @@ export function Jobs() {
                   Delete
                 </button>
               )}
-              <button type="button" className="btn" onClick={() => setShow(false)}>
+              <button type="button" className="btn" onClick={closeModal}>
                 Cancel
               </button>
               <button type="submit" className="btn btn-primary">

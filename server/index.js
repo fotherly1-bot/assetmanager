@@ -248,7 +248,10 @@ app.delete('/api/maintenance/:id', auth, (req, res) => {
 // ——— Jobs ———
 app.get('/api/jobs', auth, (req, res) => {
   const db = load();
-  res.json(db.jobs);
+  let list = db.jobs;
+  const customerId = req.query.customerId;
+  if (customerId) list = list.filter((j) => j.customerId === customerId);
+  res.json(list);
 });
 
 app.get('/api/jobs/:id', auth, (req, res) => {
