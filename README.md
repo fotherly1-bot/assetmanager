@@ -68,7 +68,7 @@ The Vite base path is `/assetmanager/` (same as Pages). The Vite proxy still map
 10. **Jobs** — linked to customers, required assets, dates, status  
 11. **Job planner board** — kanban with colour-coded asset availability (available / on job / booked / maintenance)  
 12. **Calendar** — weekly booking grid, conflict detection  
-13. **Reports** — utilisation, fuel costs, maintenance due, assets by location/category; print-friendly  
+13. **Reports** — Insights (capacity, hire, fuel, stock), utilisation, fuel costs, maintenance due, assets by location/category; print-friendly  
 14. **Navigation** — sidebar: Dashboard, Assets, Inventory, Customers, Jobs/Planner, Calendar, Maintenance, Reports, Settings  
 
 ## Seed data

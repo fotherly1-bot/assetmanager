@@ -16,10 +16,29 @@ import {
 } from 'recharts';
 import { api } from '../lib/api';
 import { formatDate, gbp, monthLabel } from '../lib/format';
-import type { Asset, MaintenanceRecord } from '../types';
+import type { Asset, Booking, Job, MaintenanceRecord, Settings } from '../types';
 import { categoryLabel } from '../lib/categories';
+import {
+  computeInsights,
+  groupInsights,
+  INSIGHT_GROUP_META,
+  type Insight,
+  type InsightSeverity,
+} from '../lib/insights';
 
-type Tab = 'utilisation' | 'fuel' | 'maintenance' | 'location' | 'category';
+type Tab = 'insights' | 'utilisation' | 'fuel' | 'maintenance' | 'location' | 'category';
+
+const SEVERITY_BADGE: Record<InsightSeverity, string> = {
+  critical: 'badge-red',
+  warn: 'badge-amber',
+  info: 'badge-blue',
+};
+
+const SEVERITY_LABEL: Record<InsightSeverity, string> = {
+  critical: 'Critical',
+  warn: 'Warning',
+  info: 'Info',
+};
 
 type FuelReport = {
   rows: { name: string; sku: string; litres: number; costGbp: number; entries: number }[];
@@ -43,12 +62,13 @@ const PIE_COLOURS = {
 const BAR_COLOURS = ['#2563eb', '#0891b2', '#7c3aed', '#059669', '#d97706', '#db2777', '#4f46e5'];
 
 export function Reports() {
-  const [tab, setTab] = useState<Tab>('utilisation');
+  const [tab, setTab] = useState<Tab>('insights');
   const [util, setUtil] = useState<{ name: string; sku: string; category: string; onJob: boolean; bookingDays: number; condition: string }[]>([]);
   const [fuel, setFuel] = useState<FuelReport | null>(null);
   const [maint, setMaint] = useState<MaintReport | null>(null);
   const [byLoc, setByLoc] = useState<Record<string, Asset[]>>({});
   const [byCat, setByCat] = useState<Record<string, Asset[]>>({});
+  const [insights, setInsights] = useState<Insight[]>([]);
 
   useEffect(() => {
     api<typeof util>('/api/reports/utilisation').then(setUtil);
@@ -67,6 +87,16 @@ export function Reports() {
     });
     api<Record<string, Asset[]>>('/api/reports/by-location').then(setByLoc);
     api<Record<string, Asset[]>>('/api/reports/by-category').then(setByCat);
+
+    Promise.all([
+      api<Asset[]>('/api/assets'),
+      api<Job[]>('/api/jobs'),
+      api<Booking[]>('/api/bookings'),
+      api<MaintenanceRecord[]>('/api/maintenance'),
+      api<Settings>('/api/settings'),
+    ]).then(([assets, jobs, bookings, maintenance, settings]) => {
+      setInsights(computeInsights({ assets, jobs, bookings, maintenance, settings }));
+    });
   }, []);
 
   const fuelByMonth = useMemo(
@@ -105,12 +135,19 @@ export function Reports() {
     return Object.entries(byType).map(([type, count]) => ({ type, count }));
   }, [maint]);
 
+  const insightGroups = useMemo(() => groupInsights(insights), [insights]);
+  const insightCounts = useMemo(() => {
+    const c = { critical: 0, warn: 0, info: 0 };
+    for (const i of insights) c[i.severity] += 1;
+    return c;
+  }, [insights]);
+
   return (
     <div className="print-area">
       <div className="page-header">
         <div>
           <h2>Reports</h2>
-          <p>Printable operational summaries — use your browser print dialog</p>
+          <p>Operational insights and printable summaries — use your browser print dialog</p>
         </div>
         <button className="btn no-print" type="button" onClick={() => window.print()}>
           Print / export
@@ -120,6 +157,7 @@ export function Reports() {
       <div className="tabs no-print">
         {(
           [
+            ['insights', 'Insights'],
             ['utilisation', 'Asset utilisation'],
             ['fuel', 'Fuel costs'],
             ['maintenance', 'Maintenance due'],
@@ -132,6 +170,63 @@ export function Reports() {
           </button>
         ))}
       </div>
+
+      {tab === 'insights' && (
+        <div className="grid" style={{ gap: '1rem' }}>
+          <div className="grid grid-4">
+            <div className="card stat-card">
+              <div className="label">Insights</div>
+              <div className="value">{insights.length}</div>
+              <div className="hint">From jobs, bookings &amp; plant</div>
+            </div>
+            <div className={`card stat-card ${insightCounts.critical ? 'stat-danger' : ''}`}>
+              <div className="label">Critical</div>
+              <div className="value">{insightCounts.critical}</div>
+              <div className="hint">Needs action now</div>
+            </div>
+            <div className={`card stat-card ${insightCounts.warn ? 'stat-warn' : ''}`}>
+              <div className="label">Warnings</div>
+              <div className="value">{insightCounts.warn}</div>
+              <div className="hint">Plan ahead</div>
+            </div>
+            <div className="card stat-card">
+              <div className="label">Info</div>
+              <div className="value">{insightCounts.info}</div>
+              <div className="hint">Opportunities</div>
+            </div>
+          </div>
+
+          {insightGroups.length === 0 ? (
+            <div className="card card-body">
+              <h3 className="card-title">All clear</h3>
+              <p style={{ color: 'var(--text-muted)', margin: 0 }}>
+                No capacity, hire, fuel or stock issues detected from the current planner data.
+              </p>
+            </div>
+          ) : (
+            insightGroups.map(({ group, items }) => (
+              <div key={group} className="card">
+                <div className="card-body">
+                  <h3 className="card-title">{INSIGHT_GROUP_META[group].title}</h3>
+                  <p style={{ color: 'var(--text-muted)', marginTop: 0 }}>{INSIGHT_GROUP_META[group].blurb}</p>
+                  <ul className="insight-list">
+                    {items.map((item) => (
+                      <li key={item.id} className={`insight-item insight-${item.severity}`}>
+                        <div className="insight-head">
+                          <span className={`badge ${SEVERITY_BADGE[item.severity]}`}>{SEVERITY_LABEL[item.severity]}</span>
+                          <strong>{item.title}</strong>
+                        </div>
+                        <p className="insight-detail">{item.detail}</p>
+                        {item.action ? <p className="insight-action">Action: {item.action}</p> : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {tab === 'utilisation' && (
         <div className="card">

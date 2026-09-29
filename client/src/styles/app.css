@@ -607,3 +607,58 @@ button.linkish {
   cursor: pointer;
 }
 .checkbox-label input { width: auto; }
+
+/* Reports insights */
+.insight-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.insight-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  background: var(--bg);
+  border-left: 4px solid var(--border);
+}
+.insight-item.insight-critical {
+  border-left-color: #dc2626;
+  background: color-mix(in srgb, #fee2e2 35%, var(--bg));
+}
+.insight-item.insight-warn {
+  border-left-color: #d97706;
+  background: color-mix(in srgb, #fef3c7 35%, var(--bg));
+}
+.insight-item.insight-info {
+  border-left-color: #2563eb;
+  background: color-mix(in srgb, #dbeafe 30%, var(--bg));
+}
+[data-theme='dark'] .insight-item.insight-critical {
+  background: color-mix(in srgb, #7f1d1d 35%, var(--bg));
+}
+[data-theme='dark'] .insight-item.insight-warn {
+  background: color-mix(in srgb, #78350f 30%, var(--bg));
+}
+[data-theme='dark'] .insight-item.insight-info {
+  background: color-mix(in srgb, #1e3a8a 30%, var(--bg));
+}
+.insight-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+.insight-detail {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.insight-action {
+  margin: 0.45rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 550;
+}
