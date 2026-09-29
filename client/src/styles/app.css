@@ -564,3 +564,46 @@ button.linkish {
   text-decoration: underline;
   font-size: inherit;
 }
+
+/* Reports charts */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+@media (max-width: 900px) {
+  .charts-row { grid-template-columns: 1fr; }
+}
+.chart-card { min-height: 320px; }
+.chart-wrap { width: 100%; min-height: 260px; }
+
+.stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.stat-chip {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.65rem 0.9rem;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.stat-chip-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.stat-chip strong { font-size: 1.05rem; }
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 550;
+  cursor: pointer;
+}
+.checkbox-label input { width: auto; }

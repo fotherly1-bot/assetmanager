@@ -4,7 +4,13 @@ import { api } from '../lib/api';
 import { FuelBar } from '../components/FuelBar';
 import { ConditionBadge, JobStatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
-import { daysOnJob, formatDate, gbp, todayISO } from '../lib/format';
+import {
+  MaintenanceForm,
+  emptyMaintForm,
+  payloadFromForm,
+  type MaintenanceFormValues,
+} from '../components/MaintenanceForm';
+import { daysOnJob, formatDate, formatOutOfService, gbp, todayISO } from '../lib/format';
 import type { Asset, FuelLog, MaintenanceRecord } from '../types';
 import { categoryLabel } from '../lib/categories';
 
@@ -27,6 +33,8 @@ export function AssetDetail() {
   const [level, setLevel] = useState('');
   const [receiptError, setReceiptError] = useState('');
   const [viewReceipt, setViewReceipt] = useState<{ url: string; name: string; mime: string } | null>(null);
+  const [maintOpen, setMaintOpen] = useState(false);
+  const [maintForm, setMaintForm] = useState<MaintenanceFormValues>(emptyMaintForm());
 
   function load() {
     if (!id) return;
@@ -112,6 +120,20 @@ export function AssetDetail() {
     load();
   }
 
+  function openMaint() {
+    setMaintForm(emptyMaintForm(id || ''));
+    setMaintOpen(true);
+  }
+
+  async function saveMaint(values: MaintenanceFormValues) {
+    await api('/api/maintenance', {
+      method: 'POST',
+      body: JSON.stringify(payloadFromForm(values)),
+    });
+    setMaintOpen(false);
+    load();
+  }
+
   async function remove() {
     if (!confirm('Delete this asset?')) return;
     await api(`/api/assets/${id}`, { method: 'DELETE' });
@@ -137,13 +159,16 @@ export function AssetDetail() {
             {categoryLabel(asset.category)} · <ConditionBadge condition={asset.condition} />
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" type="button" onClick={openMaint}>
+            Add maintenance
+          </button>
           {hasFuel && (
             <>
               <button className="btn" type="button" onClick={() => setLevelOpen(true)}>
                 Set fuel level
               </button>
-              <button className="btn btn-primary" type="button" onClick={() => setFuelOpen(true)}>
+              <button className="btn" type="button" onClick={() => setFuelOpen(true)}>
                 Log fuel cost
               </button>
             </>
@@ -269,29 +294,53 @@ export function AssetDetail() {
 
         <div className="grid" style={{ gap: '1rem' }}>
           <div className="card card-body">
-            <h3 className="card-title">Maintenance summary</h3>
-            <table className="data">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+              <h3 className="card-title" style={{ margin: 0 }}>Maintenance summary</h3>
+              <button className="btn btn-sm btn-primary" type="button" onClick={openMaint}>
+                Add
+              </button>
+            </div>
+            {asset.condition === 'Out of service' && (
+              <p style={{ margin: '0.75rem 0 0', fontSize: '0.85rem' }}>
+                <span className="badge badge-red">Out of service</span>{' '}
+                {(() => {
+                  const oos = maint.find((m) => m.outOfService);
+                  return oos ? formatOutOfService(oos.outOfServiceStart, oos.outOfServiceEnd) : '';
+                })()}
+              </p>
+            )}
+            <table className="data" style={{ marginTop: '0.75rem' }}>
               <thead>
                 <tr>
                   <th>Type</th>
+                  <th>Status</th>
                   <th>Next due</th>
-                  <th>Result</th>
+                  <th>Cost</th>
                 </tr>
               </thead>
               <tbody>
                 {maint.map((m) => {
-                  const overdue = m.nextDue && m.nextDue < today;
+                  const overdue =
+                    m.status === 'overdue' || (m.nextDue && m.nextDue < today && m.status !== 'completed');
                   return (
                     <tr key={m.id}>
-                      <td>{m.type}</td>
+                      <td>
+                        {m.type}
+                        {m.outOfService && (
+                          <div style={{ fontSize: '0.7rem', color: 'var(--danger)' }}>
+                            OOS {formatOutOfService(m.outOfServiceStart, m.outOfServiceEnd)}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <span className={`badge ${overdue ? 'badge-red' : m.status === 'completed' ? 'badge-green' : 'badge-amber'}`}>
+                          {m.status || m.result || '—'}
+                        </span>
+                      </td>
                       <td>
                         <span className={`badge ${overdue ? 'badge-red' : 'badge-grey'}`}>{formatDate(m.nextDue)}</span>
                       </td>
-                      <td>
-                        <span className={`badge ${m.result === 'Fail' ? 'badge-red' : m.result === 'Pass' ? 'badge-green' : 'badge-amber'}`}>
-                          {m.result}
-                        </span>
-                      </td>
+                      <td>{m.costGbp ? gbp(m.costGbp) : '—'}</td>
                     </tr>
                   );
                 })}
@@ -432,6 +481,19 @@ export function AssetDetail() {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {maintOpen && (
+        <Modal title="Add maintenance" onClose={() => setMaintOpen(false)} large>
+          <MaintenanceForm
+            assets={[asset]}
+            initial={maintForm}
+            lockAsset
+            submitLabel="Save booking"
+            onSubmit={saveMaint}
+            onCancel={() => setMaintOpen(false)}
+          />
         </Modal>
       )}
     </div>

@@ -36,3 +36,26 @@ export function todayISO(): string {
 export function overlaps(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
   return aStart <= bEnd && bStart <= aEnd;
 }
+
+export function daysBetween(start: string | null | undefined, end: string | null | undefined): number | null {
+  if (!start) return null;
+  const s = new Date(start.length === 10 ? start + 'T12:00:00' : start);
+  const e = end
+    ? new Date(end.length === 10 ? end + 'T12:00:00' : end)
+    : new Date();
+  const days = Math.round((e.getTime() - s.getTime()) / 86400000);
+  return Number.isFinite(days) ? Math.max(0, days) : null;
+}
+
+export function formatOutOfService(start: string | null | undefined, end: string | null | undefined): string {
+  if (!start) return '—';
+  const days = daysBetween(start, end || todayISO());
+  const range = end ? `${formatDate(start)} – ${formatDate(end)}` : `${formatDate(start)} – ongoing`;
+  return days == null ? range : `${range} (${days} day${days === 1 ? '' : 's'})`;
+}
+
+export function monthLabel(ym: string): string {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, (m || 1) - 1, 1);
+  return d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+}

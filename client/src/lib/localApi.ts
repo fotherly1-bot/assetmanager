@@ -17,6 +17,95 @@ function addDays(isoDate: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function normalizeMaint(raw: DbRow): DbRow {
+  const scheduledDate = String(raw.scheduledDate || raw.date || '');
+  const completedDate = String(raw.completedDate || (raw.status === 'completed' || raw.result ? raw.date : '') || '');
+  let status = String(raw.status || '');
+  if (!status) {
+    if (completedDate || raw.result) status = 'completed';
+    else if (scheduledDate) status = 'scheduled';
+    else status = 'completed';
+  }
+  const t = today();
+  if (status === 'scheduled' && scheduledDate && scheduledDate < t) status = 'overdue';
+  if (status !== 'completed' && status !== 'in_progress' && raw.nextDue && String(raw.nextDue) < t && !completedDate) {
+    // keep computed overdue for open bookings past nextDue
+  }
+  return {
+    ...raw,
+    type: raw.type || 'Service',
+    date: completedDate || scheduledDate || String(raw.date || t),
+    scheduledDate,
+    completedDate,
+    nextDue: String(raw.nextDue || ''),
+    status,
+    result: raw.result || '',
+    costGbp: Number(raw.costGbp) || 0,
+    vendor: String(raw.vendor || ''),
+    description: String(raw.description || ''),
+    notes: String(raw.notes || ''),
+    outOfService: !!raw.outOfService,
+    outOfServiceStart: String(raw.outOfServiceStart || ''),
+    outOfServiceEnd: String(raw.outOfServiceEnd || ''),
+  };
+}
+
+function isOosActive(m: DbRow, t: string): boolean {
+  if (!m.outOfService) return false;
+  const start = String(m.outOfServiceStart || m.scheduledDate || '');
+  if (!start || start > t) return false;
+  const end = String(m.outOfServiceEnd || '');
+  if (end && end < t) return false;
+  // completed with ended OOS already handled by end date
+  return true;
+}
+
+function syncAssetOutOfService(db: LocalDb, assetId: string) {
+  const asset = db.assets.find((a) => a.id === assetId);
+  if (!asset) return;
+  const t = today();
+  const active = db.maintenance.some((m) => m.assetId === assetId && isOosActive(normalizeMaint(m), t));
+  if (active) {
+    asset.condition = 'Out of service';
+  } else if (asset.condition === 'Out of service') {
+    // restore only if no other active OOS — leave as Good when coming back into service
+    asset.condition = 'Good';
+  }
+}
+
+function buildMaintEntry(body: Record<string, unknown>, existing?: DbRow): DbRow {
+  const scheduledDate = String(body.scheduledDate ?? existing?.scheduledDate ?? body.date ?? today());
+  const completedDate = String(
+    body.completedDate ?? existing?.completedDate ?? (body.status === 'completed' ? body.date || scheduledDate : '') ?? ''
+  );
+  let status = String(body.status ?? existing?.status ?? '');
+  if (!status) status = completedDate ? 'completed' : 'scheduled';
+  const t = today();
+  if (status === 'scheduled' && scheduledDate && scheduledDate < t) status = 'overdue';
+  const outOfService = body.outOfService !== undefined ? !!body.outOfService : !!existing?.outOfService;
+  return normalizeMaint({
+    ...(existing || {}),
+    ...body,
+    type: body.type ?? existing?.type ?? 'Service',
+    scheduledDate,
+    completedDate,
+    date: completedDate || scheduledDate,
+    nextDue: body.nextDue ?? existing?.nextDue ?? '',
+    status,
+    result: body.result ?? existing?.result ?? '',
+    costGbp: body.costGbp !== undefined ? Number(body.costGbp) || 0 : Number(existing?.costGbp) || 0,
+    vendor: body.vendor ?? existing?.vendor ?? '',
+    description: body.description ?? existing?.description ?? '',
+    notes: body.notes ?? existing?.notes ?? '',
+    outOfService,
+    outOfServiceStart: outOfService
+      ? String(body.outOfServiceStart ?? existing?.outOfServiceStart ?? scheduledDate)
+      : '',
+    outOfServiceEnd: outOfService ? String(body.outOfServiceEnd ?? existing?.outOfServiceEnd ?? '') : '',
+  });
+}
+
+
 export function loadDb(): LocalDb {
   const raw = localStorage.getItem(DB_KEY);
   if (!raw) {
@@ -206,7 +295,10 @@ export async function localApiHandle(
           .sort((a, b) => String(b.date).localeCompare(String(a.date)));
         const maintenance = db.maintenance
           .filter((x) => x.assetId === id)
-          .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+          .map(normalizeMaint)
+          .sort((a, b) =>
+            String(b.scheduledDate || b.date).localeCompare(String(a.scheduledDate || a.date))
+          );
         const bookings = db.bookings.filter((b) => b.assetId === id);
         const job = item.currentJobId
           ? db.jobs.find((j) => j.id === item.currentJobId) || null
@@ -288,23 +380,24 @@ export async function localApiHandle(
 
   // Maintenance
   if (pathname === '/api/maintenance' && method === 'GET') {
-    let list = db.maintenance;
+    let list = db.maintenance.map(normalizeMaint);
     const assetId = query.get('assetId');
     if (assetId) list = list.filter((x) => x.assetId === assetId);
-    return [...list].sort((a, b) => String(a.nextDue || '').localeCompare(String(b.nextDue || '')));
+    return [...list].sort((a, b) =>
+      String(a.scheduledDate || a.nextDue || '').localeCompare(String(b.scheduledDate || b.nextDue || ''))
+    );
   }
   if (pathname === '/api/maintenance' && method === 'POST') {
-    const entry = {
+    const entry = buildMaintEntry(body, {
       id: uid(),
       assetId: body.assetId,
-      type: body.type || 'Service',
-      date: body.date || today(),
-      nextDue: body.nextDue || '',
-      result: body.result || 'Pass',
-      notes: body.notes || '',
       createdAt: new Date().toISOString(),
-    };
+    });
+    entry.id = entry.id || uid();
+    entry.assetId = body.assetId;
+    entry.createdAt = entry.createdAt || new Date().toISOString();
     db.maintenance.push(entry);
+    syncAssetOutOfService(db, String(entry.assetId));
     saveDb(db);
     return entry;
   }
@@ -315,12 +408,19 @@ export async function localApiHandle(
       if (method === 'PUT') {
         const idx = db.maintenance.findIndex((x) => x.id === id);
         if (idx < 0) throw notFound();
-        db.maintenance[idx] = { ...db.maintenance[idx], ...body, id };
+        const prev = db.maintenance[idx];
+        const entry = buildMaintEntry(body, prev);
+        entry.id = id;
+        entry.createdAt = prev.createdAt;
+        db.maintenance[idx] = entry;
+        syncAssetOutOfService(db, String(entry.assetId));
         saveDb(db);
-        return db.maintenance[idx];
+        return entry;
       }
       if (method === 'DELETE') {
+        const prev = db.maintenance.find((x) => x.id === id);
         db.maintenance = db.maintenance.filter((x) => x.id !== id);
+        if (prev) syncAssetOutOfService(db, String(prev.assetId));
         saveDb(db);
         return { ok: true };
       }
@@ -466,14 +566,20 @@ export async function localApiHandle(
   if (pathname === '/api/planner' && method === 'GET') {
     const t = today();
     const assetStatus = db.assets.map((a) => {
-      const hasOverdue = db.maintenance.some(
-        (m) => m.assetId === a.id && m.nextDue && String(m.nextDue) < t
+      const maint = db.maintenance.filter((m) => m.assetId === a.id).map(normalizeMaint);
+      const hasOverdue = maint.some(
+        (m) =>
+          (m.nextDue && String(m.nextDue) < t && m.status !== 'completed') ||
+          m.status === 'overdue' ||
+          (m.status === 'scheduled' && m.scheduledDate && String(m.scheduledDate) < t)
       );
+      const oosNow =
+        a.condition === 'Out of service' || maint.some((m) => isOosActive(m, t));
       const booked = db.bookings.some(
         (b) => b.assetId === a.id && String(b.startDate) <= t && String(b.endDate) >= t
       );
       let availability = 'available';
-      if (hasOverdue || a.condition === 'Out of service') availability = 'maintenance';
+      if (oosNow || hasOverdue) availability = 'maintenance';
       else if (a.currentJobId) availability = 'on_job';
       else if (booked) availability = 'booked';
       return { ...a, availability, overdueMaint: hasOverdue };
@@ -506,40 +612,74 @@ export async function localApiHandle(
 
   if (pathname === '/api/reports/fuel' && method === 'GET') {
     const byAsset: Record<string, { litres: number; costGbp: number; entries: number }> = {};
+    const byMonthMap: Record<string, { litres: number; costGbp: number; entries: number }> = {};
     for (const f of db.fuelLogs) {
       const aid = String(f.assetId);
       if (!byAsset[aid]) byAsset[aid] = { litres: 0, costGbp: 0, entries: 0 };
       byAsset[aid].litres += Number(f.litres) || 0;
       byAsset[aid].costGbp += Number(f.costGbp) || 0;
       byAsset[aid].entries += 1;
+      const month = String(f.date || '').slice(0, 7);
+      if (month) {
+        if (!byMonthMap[month]) byMonthMap[month] = { litres: 0, costGbp: 0, entries: 0 };
+        byMonthMap[month].litres += Number(f.litres) || 0;
+        byMonthMap[month].costGbp += Number(f.costGbp) || 0;
+        byMonthMap[month].entries += 1;
+      }
     }
-    const rows = Object.entries(byAsset).map(([assetId, agg]) => {
-      const a = db.assets.find((x) => x.id === assetId);
-      return { assetId, name: a?.name || assetId, sku: a?.sku, ...agg };
-    });
+    const rows = Object.entries(byAsset)
+      .map(([assetId, agg]) => {
+        const a = db.assets.find((x) => x.id === assetId);
+        return { assetId, name: a?.name || assetId, sku: a?.sku, ...agg };
+      })
+      .sort((a, b) => b.costGbp - a.costGbp);
+    const byMonth = Object.entries(byMonthMap)
+      .map(([month, agg]) => ({ month, ...agg }))
+      .sort((a, b) => a.month.localeCompare(b.month));
     const totalCost = rows.reduce((s, r) => s + r.costGbp, 0);
     const totalLitres = rows.reduce((s, r) => s + r.litres, 0);
-    return { rows, totalCost, totalLitres };
+    return { rows, byMonth, totalCost, totalLitres };
   }
 
   if (pathname === '/api/reports/maintenance-due' && method === 'GET') {
     const t = today();
-    return db.maintenance
-      .map((m) => {
-        const a = db.assets.find((x) => x.id === m.assetId);
-        const overdue = !!(m.nextDue && String(m.nextDue) < t);
-        const dueSoon = !!(m.nextDue && String(m.nextDue) >= t && String(m.nextDue) <= addDays(t, 30));
-        return {
-          ...m,
-          assetName: a?.name,
-          sku: a?.sku,
-          category: a?.category,
-          overdue,
-          dueSoon,
-        };
-      })
-      .filter((r: DbRow) => r.overdue || r.dueSoon || !r.nextDue)
-      .sort((a: DbRow, b: DbRow) => String(a.nextDue || '').localeCompare(String(b.nextDue || '')));
+    const all: DbRow[] = db.maintenance.map((m) => {
+      const n = normalizeMaint(m);
+      const a = db.assets.find((x) => x.id === n.assetId);
+      const overdue =
+        n.status === 'overdue' ||
+        !!(n.nextDue && String(n.nextDue) < t && n.status !== 'completed') ||
+        !!(n.status === 'scheduled' && n.scheduledDate && String(n.scheduledDate) < t);
+      const dueSoon = !!(
+        !overdue &&
+        n.nextDue &&
+        String(n.nextDue) >= t &&
+        String(n.nextDue) <= addDays(t, 30)
+      );
+      const ok = !overdue && !dueSoon;
+      return {
+        ...n,
+        assetName: a?.name,
+        sku: a?.sku,
+        category: a?.category,
+        overdue,
+        dueSoon,
+        ok,
+      };
+    });
+    const summary = {
+      overdue: all.filter((r) => r.overdue).length,
+      dueSoon: all.filter((r) => r.dueSoon).length,
+      ok: all.filter((r) => r.ok).length,
+      scheduled: all.filter((r) => r.status === 'scheduled' || r.status === 'in_progress').length,
+      totalCost: all.reduce((s, r) => s + (Number(r.costGbp) || 0), 0),
+    };
+    const rows = all
+      .filter((r) => r.overdue || r.dueSoon || r.status === 'scheduled' || r.status === 'in_progress')
+      .sort((a, b) =>
+        String(a.nextDue || a.scheduledDate || '').localeCompare(String(b.nextDue || b.scheduledDate || ''))
+      );
+    return { rows, summary, all };
   }
 
   if (pathname === '/api/reports/by-location' && method === 'GET') {

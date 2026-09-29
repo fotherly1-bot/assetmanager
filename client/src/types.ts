@@ -9,6 +9,8 @@ export type Category =
 export type Condition = 'Excellent' | 'Good' | 'Fair' | 'Poor' | 'Out of service';
 export type JobStatus = 'Planned' | 'In progress' | 'Completed' | 'On hold' | 'Cancelled';
 export type Availability = 'available' | 'on_job' | 'maintenance' | 'booked';
+export type MaintStatus = 'scheduled' | 'in_progress' | 'completed' | 'overdue';
+export type MaintResult = 'Pass' | 'Fail' | 'Advisory' | '';
 
 export interface User {
   id: string;
@@ -88,10 +90,20 @@ export interface MaintenanceRecord {
   id: string;
   assetId: string;
   type: string;
+  /** Completed date (legacy field name kept for compatibility). */
   date: string;
+  scheduledDate: string;
+  completedDate: string;
   nextDue: string;
-  result: 'Pass' | 'Fail' | 'Advisory';
+  status: MaintStatus;
+  result: MaintResult;
+  costGbp: number;
+  vendor: string;
+  description: string;
   notes: string;
+  outOfService: boolean;
+  outOfServiceStart: string;
+  outOfServiceEnd: string;
   createdAt: string;
   assetName?: string;
   sku?: string;
@@ -129,4 +141,10 @@ export const CATEGORIES: Category[] = [
 export const CONDITIONS: Condition[] = ['Excellent', 'Good', 'Fair', 'Poor', 'Out of service'];
 export const JOB_STATUSES: JobStatus[] = ['Planned', 'In progress', 'Completed', 'On hold', 'Cancelled'];
 export const MAINT_TYPES = ['Service', 'MOT', 'PAT', 'LOLER', 'Inspection', 'Repair'];
+export const MAINT_STATUSES: { value: MaintStatus; label: string }[] = [
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'overdue', label: 'Overdue' },
+];
 export const STOCK_CATEGORIES: Category[] = ['Hand tools', 'Power tools', 'Building products', 'Consumables'];

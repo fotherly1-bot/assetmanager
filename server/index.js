@@ -114,7 +114,10 @@ app.get('/api/assets/:id', auth, (req, res) => {
   const item = db.assets.find((a) => a.id === req.params.id);
   if (!item) return res.status(404).json({ error: 'Not found' });
   const fuelLogs = db.fuelLogs.filter((f) => f.assetId === item.id).sort((a, b) => b.date.localeCompare(a.date));
-  const maintenance = db.maintenance.filter((m) => m.assetId === item.id).sort((a, b) => b.date.localeCompare(a.date));
+  const maintenance = db.maintenance
+    .filter((m) => m.assetId === item.id)
+    .map(normalizeMaint)
+    .sort((a, b) => String(b.scheduledDate || b.date).localeCompare(String(a.scheduledDate || a.date)));
   const bookings = db.bookings.filter((b) => b.assetId === item.id);
   const job = item.currentJobId ? db.jobs.find((j) => j.id === item.currentJobId) : null;
   res.json({ ...item, fuelLogs, maintenance, bookings, currentJob: job });
@@ -224,27 +227,114 @@ app.delete('/api/fuel/:id', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+
+function normalizeMaint(raw) {
+  const scheduledDate = String(raw.scheduledDate || raw.date || '');
+  const completedDate = String(raw.completedDate || (raw.status === 'completed' || raw.result ? raw.date : '') || '');
+  let status = String(raw.status || '');
+  if (!status) {
+    if (completedDate || raw.result) status = 'completed';
+    else if (scheduledDate) status = 'scheduled';
+    else status = 'completed';
+  }
+  const t = new Date().toISOString().slice(0, 10);
+  if (status === 'scheduled' && scheduledDate && scheduledDate < t) status = 'overdue';
+  return {
+    ...raw,
+    type: raw.type || 'Service',
+    date: completedDate || scheduledDate || String(raw.date || t),
+    scheduledDate,
+    completedDate,
+    nextDue: String(raw.nextDue || ''),
+    status,
+    result: raw.result || '',
+    costGbp: Number(raw.costGbp) || 0,
+    vendor: String(raw.vendor || ''),
+    description: String(raw.description || ''),
+    notes: String(raw.notes || ''),
+    outOfService: !!raw.outOfService,
+    outOfServiceStart: String(raw.outOfServiceStart || ''),
+    outOfServiceEnd: String(raw.outOfServiceEnd || ''),
+  };
+}
+
+function isOosActive(m, t) {
+  if (!m.outOfService) return false;
+  const start = String(m.outOfServiceStart || m.scheduledDate || '');
+  if (!start || start > t) return false;
+  const end = String(m.outOfServiceEnd || '');
+  if (end && end < t) return false;
+  return true;
+}
+
+function syncAssetOutOfService(db, assetId) {
+  const asset = db.assets.find((a) => a.id === assetId);
+  if (!asset) return;
+  const t = new Date().toISOString().slice(0, 10);
+  const active = db.maintenance.some((m) => m.assetId === assetId && isOosActive(normalizeMaint(m), t));
+  if (active) {
+    asset.condition = 'Out of service';
+  } else if (asset.condition === 'Out of service') {
+    asset.condition = 'Good';
+  }
+}
+
+function buildMaintEntry(body, existing) {
+  const scheduledDate = String(body.scheduledDate ?? existing?.scheduledDate ?? body.date ?? new Date().toISOString().slice(0, 10));
+  const completedDate = String(
+    body.completedDate ?? existing?.completedDate ?? (body.status === 'completed' ? body.date || scheduledDate : '') ?? ''
+  );
+  let status = String(body.status ?? existing?.status ?? '');
+  if (!status) status = completedDate ? 'completed' : 'scheduled';
+  const t = new Date().toISOString().slice(0, 10);
+  if (status === 'scheduled' && scheduledDate && scheduledDate < t) status = 'overdue';
+  const outOfService = body.outOfService !== undefined ? !!body.outOfService : !!existing?.outOfService;
+  return normalizeMaint({
+    ...(existing || {}),
+    ...body,
+    type: body.type ?? existing?.type ?? 'Service',
+    scheduledDate,
+    completedDate,
+    date: completedDate || scheduledDate,
+    nextDue: body.nextDue ?? existing?.nextDue ?? '',
+    status,
+    result: body.result ?? existing?.result ?? '',
+    costGbp: body.costGbp !== undefined ? Number(body.costGbp) || 0 : Number(existing?.costGbp) || 0,
+    vendor: body.vendor ?? existing?.vendor ?? '',
+    description: body.description ?? existing?.description ?? '',
+    notes: body.notes ?? existing?.notes ?? '',
+    outOfService,
+    outOfServiceStart: outOfService
+      ? String(body.outOfServiceStart ?? existing?.outOfServiceStart ?? scheduledDate)
+      : '',
+    outOfServiceEnd: outOfService ? String(body.outOfServiceEnd ?? existing?.outOfServiceEnd ?? '') : '',
+  });
+}
+
 // ——— Maintenance ———
 app.get('/api/maintenance', auth, (req, res) => {
   const db = load();
-  let list = db.maintenance;
+  let list = db.maintenance.map(normalizeMaint);
   if (req.query.assetId) list = list.filter((m) => m.assetId === req.query.assetId);
-  res.json(list.sort((a, b) => (a.nextDue || '').localeCompare(b.nextDue || '')));
+  res.json(
+    list.sort((a, b) =>
+      String(a.scheduledDate || a.nextDue || '').localeCompare(String(b.scheduledDate || b.nextDue || ''))
+    )
+  );
 });
 
 app.post('/api/maintenance', auth, (req, res) => {
   const db = load();
-  const entry = {
+  const entry = buildMaintEntry(req.body, {
     id: id(),
     assetId: req.body.assetId,
-    type: req.body.type || 'Service',
-    date: req.body.date || new Date().toISOString().slice(0, 10),
-    nextDue: req.body.nextDue || '',
-    result: req.body.result || 'Pass',
-    notes: req.body.notes || '',
     createdAt: new Date().toISOString(),
-  };
+  });
+  entry.id = entry.id || id();
+  entry.assetId = req.body.assetId;
+  entry.createdAt = entry.createdAt || new Date().toISOString();
   db.maintenance.push(entry);
+  syncAssetOutOfService(db, entry.assetId);
   save(db);
   res.status(201).json(entry);
 });
@@ -253,14 +343,21 @@ app.put('/api/maintenance/:id', auth, (req, res) => {
   const db = load();
   const idx = db.maintenance.findIndex((m) => m.id === req.params.id);
   if (idx < 0) return res.status(404).json({ error: 'Not found' });
-  db.maintenance[idx] = { ...db.maintenance[idx], ...req.body, id: db.maintenance[idx].id };
+  const prev = db.maintenance[idx];
+  const entry = buildMaintEntry(req.body, prev);
+  entry.id = prev.id;
+  entry.createdAt = prev.createdAt;
+  db.maintenance[idx] = entry;
+  syncAssetOutOfService(db, entry.assetId);
   save(db);
-  res.json(db.maintenance[idx]);
+  res.json(entry);
 });
 
 app.delete('/api/maintenance/:id', auth, (req, res) => {
   const db = load();
+  const prev = db.maintenance.find((m) => m.id === req.params.id);
   db.maintenance = db.maintenance.filter((m) => m.id !== req.params.id);
+  if (prev) syncAssetOutOfService(db, prev.assetId);
   save(db);
   res.json({ ok: true });
 });
@@ -433,34 +530,64 @@ app.get('/api/reports/utilisation', auth, (req, res) => {
 app.get('/api/reports/fuel', auth, (req, res) => {
   const db = load();
   const byAsset = {};
+  const byMonthMap = {};
   for (const f of db.fuelLogs) {
     if (!byAsset[f.assetId]) byAsset[f.assetId] = { litres: 0, costGbp: 0, entries: 0 };
     byAsset[f.assetId].litres += f.litres;
     byAsset[f.assetId].costGbp += f.costGbp;
     byAsset[f.assetId].entries += 1;
+    const month = String(f.date || '').slice(0, 7);
+    if (month) {
+      if (!byMonthMap[month]) byMonthMap[month] = { litres: 0, costGbp: 0, entries: 0 };
+      byMonthMap[month].litres += f.litres;
+      byMonthMap[month].costGbp += f.costGbp;
+      byMonthMap[month].entries += 1;
+    }
   }
-  const rows = Object.entries(byAsset).map(([assetId, agg]) => {
-    const a = db.assets.find((x) => x.id === assetId);
-    return { assetId, name: a?.name || assetId, sku: a?.sku, ...agg };
-  });
+  const rows = Object.entries(byAsset)
+    .map(([assetId, agg]) => {
+      const a = db.assets.find((x) => x.id === assetId);
+      return { assetId, name: a?.name || assetId, sku: a?.sku, ...agg };
+    })
+    .sort((a, b) => b.costGbp - a.costGbp);
+  const byMonth = Object.entries(byMonthMap)
+    .map(([month, agg]) => ({ month, ...agg }))
+    .sort((a, b) => a.month.localeCompare(b.month));
   const totalCost = rows.reduce((s, r) => s + r.costGbp, 0);
   const totalLitres = rows.reduce((s, r) => s + r.litres, 0);
-  res.json({ rows, totalCost, totalLitres });
+  res.json({ rows, byMonth, totalCost, totalLitres });
 });
 
 app.get('/api/reports/maintenance-due', auth, (req, res) => {
   const db = load();
   const today = new Date().toISOString().slice(0, 10);
-  const rows = db.maintenance
-    .map((m) => {
-      const a = db.assets.find((x) => x.id === m.assetId);
-      const overdue = m.nextDue && m.nextDue < today;
-      const dueSoon = m.nextDue && m.nextDue >= today && m.nextDue <= addDays(today, 30);
-      return { ...m, assetName: a?.name, sku: a?.sku, category: a?.category, overdue, dueSoon };
-    })
-    .filter((r) => r.overdue || r.dueSoon || !r.nextDue)
-    .sort((a, b) => (a.nextDue || '').localeCompare(b.nextDue || ''));
-  res.json(rows);
+  const all = db.maintenance.map((m) => {
+    const n = normalizeMaint(m);
+    const a = db.assets.find((x) => x.id === n.assetId);
+    const overdue =
+      n.status === 'overdue' ||
+      !!(n.nextDue && n.nextDue < today && n.status !== 'completed') ||
+      !!(n.status === 'scheduled' && n.scheduledDate && n.scheduledDate < today);
+    const dueSoon = !!(
+      !overdue &&
+      n.nextDue &&
+      n.nextDue >= today &&
+      n.nextDue <= addDays(today, 30)
+    );
+    const ok = !overdue && !dueSoon;
+    return { ...n, assetName: a?.name, sku: a?.sku, category: a?.category, overdue, dueSoon, ok };
+  });
+  const summary = {
+    overdue: all.filter((r) => r.overdue).length,
+    dueSoon: all.filter((r) => r.dueSoon).length,
+    ok: all.filter((r) => r.ok).length,
+    scheduled: all.filter((r) => r.status === 'scheduled' || r.status === 'in_progress').length,
+    totalCost: all.reduce((s, r) => s + (Number(r.costGbp) || 0), 0),
+  };
+  const rows = all
+    .filter((r) => r.overdue || r.dueSoon || r.status === 'scheduled' || r.status === 'in_progress')
+    .sort((a, b) => String(a.nextDue || a.scheduledDate || '').localeCompare(String(b.nextDue || b.scheduledDate || '')));
+  res.json({ rows, summary, all });
 });
 
 app.get('/api/reports/by-location', auth, (req, res) => {
@@ -488,13 +615,17 @@ app.get('/api/planner', auth, (req, res) => {
   const db = load();
   const today = new Date().toISOString().slice(0, 10);
   const assetStatus = db.assets.map((a) => {
-    const overdueMaint = db.maintenance.some(
-      (m) => m.assetId === a.id && m.nextDue && m.nextDue < today && (m.result === 'Fail' || true)
+    const maint = db.maintenance.filter((m) => m.assetId === a.id).map(normalizeMaint);
+    const hasOverdue = maint.some(
+      (m) =>
+        (m.nextDue && m.nextDue < today && m.status !== 'completed') ||
+        m.status === 'overdue' ||
+        (m.status === 'scheduled' && m.scheduledDate && m.scheduledDate < today)
     );
-    const hasOverdue = db.maintenance.some((m) => m.assetId === a.id && m.nextDue && m.nextDue < today);
+    const oosNow = a.condition === 'Out of service' || maint.some((m) => isOosActive(m, today));
     const booked = db.bookings.some((b) => b.assetId === a.id && b.startDate <= today && b.endDate >= today);
     let availability = 'available';
-    if (hasOverdue || a.condition === 'Out of service') availability = 'maintenance';
+    if (oosNow || hasOverdue) availability = 'maintenance';
     else if (a.currentJobId) availability = 'on_job';
     else if (booked) availability = 'booked';
     return { ...a, availability, overdueMaint: hasOverdue };

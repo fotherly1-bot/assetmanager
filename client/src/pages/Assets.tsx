@@ -4,6 +4,12 @@ import { api } from '../lib/api';
 import { FuelBar } from '../components/FuelBar';
 import { ConditionBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
+import {
+  MaintenanceForm,
+  emptyMaintForm,
+  payloadFromForm,
+  type MaintenanceFormValues,
+} from '../components/MaintenanceForm';
 import { CATEGORIES, CONDITIONS, type Asset, type Category, type Condition } from '../types';
 import { categoryLabel } from '../lib/categories';
 
@@ -29,6 +35,8 @@ export function Assets() {
   const [cat, setCat] = useState('');
   const [show, setShow] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [maintOpen, setMaintOpen] = useState(false);
+  const [maintForm, setMaintForm] = useState<MaintenanceFormValues>(emptyMaintForm());
   const navigate = useNavigate();
 
   function load() {
@@ -64,6 +72,20 @@ export function Assets() {
     });
     setShow(false);
     setForm(emptyForm);
+    load();
+  }
+
+  function openMaint(assetId: string) {
+    setMaintForm(emptyMaintForm(assetId));
+    setMaintOpen(true);
+  }
+
+  async function saveMaint(values: MaintenanceFormValues) {
+    await api('/api/maintenance', {
+      method: 'POST',
+      body: JSON.stringify(payloadFromForm(values)),
+    });
+    setMaintOpen(false);
     load();
   }
 
@@ -103,6 +125,7 @@ export function Assets() {
               <th>Fuel</th>
               <th>Location</th>
               <th>Job</th>
+              <th className="no-print"></th>
             </tr>
           </thead>
           <tbody>
@@ -123,12 +146,29 @@ export function Assets() {
                 </td>
                 <td>{a.postcode || a.locationDescription || '—'}</td>
                 <td>{a.currentJobId ? <span className="badge badge-blue">Assigned</span> : <span className="badge">Idle</span>}</td>
+                <td className="no-print" onClick={(e) => e.stopPropagation()}>
+                  <button className="btn btn-sm" type="button" onClick={() => openMaint(a.id)}>
+                    Add maintenance
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
         {filtered.length === 0 && <div className="empty">No assets match your filters</div>}
       </div>
+
+      {maintOpen && (
+        <Modal title="Add maintenance" onClose={() => setMaintOpen(false)} large>
+          <MaintenanceForm
+            assets={assets}
+            initial={maintForm}
+            submitLabel="Save booking"
+            onSubmit={saveMaint}
+            onCancel={() => setMaintOpen(false)}
+          />
+        </Modal>
+      )}
 
       {show && (
         <Modal title="Add asset" onClose={() => setShow(false)} large>
